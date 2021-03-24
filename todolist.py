@@ -4,7 +4,6 @@ from sqlalchemy import Column, Integer, String, Date, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-engine = create_engine('sqlite:///todo.db?check_same_thread=False')
 Base = declarative_base()
 
 
@@ -18,48 +17,30 @@ class Table(Base):
         return self.task
 
 
-Base.metadata.create_all(engine)
-
-
 class Menu:
     def __init__(self):
         self.todo = Todo()
-        self.run = True
+        self.menu = {"Today's tasks": self.todo.today_tasks,
+                     "Week's tasks": self.todo.week_tasks,
+                     "All tasks": self.todo.all_tasks,
+                     "Missed tasks": self.todo.missed_tasks,
+                     "Add task": self.todo.new_task,
+                     "Delete task": self.todo.delete_task,
+                     "Exit": exit}
 
     def start(self):
-        while self.run:
-            self.main_menu()
+        while True:
+            self.main_loop()
 
-    def main_menu(self):
-        print("\n1) Today's tasks")
-        print("2) Week's tasks")
-        print('3) All tasks')
-        print('4) Missed tasks')
-        print('5) Add task')
-        print('6) Delete task')
-        print('0) Exit')
-
-        user_input = input()
-        if user_input == '1':
-            self.todo.today_tasks()
-        elif user_input == '2':
-            self.todo.week_tasks()
-        elif user_input == '3':
-            self.todo.all_tasks()
-        elif user_input == '4':
-            self.todo.missed_tasks()
-        elif user_input == '5':
-            self.todo.new_task()
-        elif user_input == '6':
-            self.todo.delete_task()
-        elif user_input == '0':
-            self.run = False
-        else:
-            print('1 - 6 or 0 for exit')
+    def main_loop(self):
+        raw_input = input('\n' + '\n'.join(f'{(i + 1) % len(self.menu)}) {x}' for i, x in enumerate(self.menu)))
+        list(self.menu.values())[(int(raw_input) - 1)]()
 
 
 class Todo:
     def __init__(self):
+        engine = create_engine('sqlite:///todo.db?check_same_thread=False')
+        Base.metadata.create_all(engine)
         self.session = sessionmaker(bind=engine)()
 
     def new_task(self):
@@ -99,8 +80,7 @@ class Todo:
             print('Nothing to do!')
 
     def missed_tasks(self):
-        today = datetime.today().date()
-        rows = self.session.query(Table).filter(Table.deadline < today).order_by(Table.deadline).all()
+        rows = self.session.query(Table).filter(Table.deadline < datetime.today().date()).order_by(Table.deadline).all()
         print('Missed tasks:')
         if rows:
             print('\n'.join(f'{row.id}. {row}. {row.deadline.strftime("%d %b")}' for row in rows))
@@ -119,9 +99,5 @@ class Todo:
         self.session.query(Table).filter(Table.id == user_input).delete()
         self.session.commit()
 
-if __name__ == '__main__':
-    try:
-        Menu().start()
-    except KeyboardInterrupt:
-        print('Bye!')
-        exit()
+
+Menu().start()
