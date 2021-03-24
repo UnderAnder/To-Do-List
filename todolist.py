@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-
 from sqlalchemy import Column, Integer, String, Date, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -14,7 +13,7 @@ class Table(Base):
     deadline = Column(Date, default=datetime.today())
 
     def __repr__(self):
-        return self.task
+        return f'{self.id}. {self.task}. {self.deadline.strftime("%d %b")}'
 
 
 class Menu:
@@ -28,13 +27,10 @@ class Menu:
                      "Delete task": self.todo.delete_task,
                      "Exit": exit}
 
-    def start(self):
-        while True:
-            self.main_loop()
-
     def main_loop(self):
-        raw_input = input('\n' + '\n'.join(f'{(i + 1) % len(self.menu)}) {x}' for i, x in enumerate(self.menu)))
-        list(self.menu.values())[(int(raw_input) - 1)]()
+        while True:
+            raw_input = input('\n'+'\n'.join(f'{(i + 1) % len(self.menu)}) {x}' for i, x in enumerate(self.menu))+'\n')
+            list(self.menu.values())[(int(raw_input) - 1)]()
 
 
 class Todo:
@@ -47,8 +43,7 @@ class Todo:
         task_input = input('Enter task\n')
         deadline_input = input('Enter deadline\n')
         date = datetime.strptime(deadline_input, '%Y-%m-%d')
-        new_row = Table(task=task_input, deadline=date)
-        self.session.add(new_row)
+        self.session.add(Table(task=task_input, deadline=date))
         self.session.commit()
         print('The task has been added!')
 
@@ -56,48 +51,33 @@ class Todo:
         today = datetime.today().date()
         rows = self.session.query(Table).filter(Table.deadline == today).all()
         print(f'Today {today.strftime("%d %b")}:')
-        if rows:
-            print('\n'.join(f'{row.id}. {row}' for row in rows))
-        else:
-            print('Nothing to do!')
+        print('\n'.join(str(row) for row in rows) if rows else 'Nothing to do!')
 
     def week_tasks(self):
         for i in range(7):
             date = datetime.today().date() + timedelta(days=i)
             rows = self.session.query(Table).filter(Table.deadline == date).order_by(Table.deadline).all()
             print(f'{date.strftime("%A %d %b")}:')
-            if rows:
-                print('\n'.join(f'{row.id}. {row}' for row in rows))
-            else:
-                print('Nothing to do!')
+            print('\n'.join(str(row) for row in rows) if rows else 'Nothing to do!')
             print('')
 
     def all_tasks(self):
         rows = self.session.query(Table).order_by(Table.deadline).all()
-        if rows:
-            print('\n'.join(f'{row.id}. {row}. {row.deadline.strftime("%d %b")}' for row in rows))
-        else:
-            print('Nothing to do!')
+        print('\n'.join(str(row) for row in rows) if rows else 'Nothing to do!')
 
     def missed_tasks(self):
         rows = self.session.query(Table).filter(Table.deadline < datetime.today().date()).order_by(Table.deadline).all()
         print('Missed tasks:')
-        if rows:
-            print('\n'.join(f'{row.id}. {row}. {row.deadline.strftime("%d %b")}' for row in rows))
-        else:
-            print('Nothing is missed!')
+        print('\n'.join(str(row) for row in rows) if rows else 'Nothing is missed!')
 
     def delete_task(self):
         rows = self.session.query(Table).order_by(Table.deadline).all()
         print('Choose the number of the task you want to delete:')
+        print('\n'.join(str(row)for row in rows) if rows else 'Nothing to delete!')
         if rows:
-            print('\n'.join(f'{row.id}. {row}. {row.deadline.strftime("%d %b")}' for row in rows))
-        else:
-            print('Nothing to delete!')
-            return
-        user_input = int(input())
-        self.session.query(Table).filter(Table.id == user_input).delete()
-        self.session.commit()
+            user_input = int(input())
+            self.session.query(Table).filter(Table.id == user_input).delete()
+            self.session.commit()
 
 
-Menu().start()
+Menu().main_loop()
